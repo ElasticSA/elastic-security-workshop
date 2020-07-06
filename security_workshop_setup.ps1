@@ -13,7 +13,7 @@ $cluster_name = "$date $cluster_name"
 $elastic_cloud_api_uri = "https://api.elastic-cloud.com/api/v1/deployments"
 $elastic_cloud_plan_template = "$install_dir\wsplan.json"
 $credentials_file_path = "C:\Users\Administrator\Desktop\cluster.txt"
-$beat_config_repository_uri = "https://raw.githubusercontent.com/mrebeschini/elastic-security-workshop/v1.0/"
+$beat_config_repository_uri = "https://raw.githubusercontent.com/ElasticSA/elastic-security-workshop/v1.0/"
 
 Write-Output "*** Security Workshop Setup ***`n"
 
@@ -47,6 +47,7 @@ Invoke-WebRequest -Uri "$beat_config_repository_uri/wsplan.json" -OutFile "$inst
 $elastic_cloud_plan = Get-Content -Raw $elastic_cloud_plan_template | ConvertFrom-JSON
 $elastic_cloud_plan.name = $cluster_name
 $elastic_cloud_plan.resources[0].elasticsearch[0].region = $target_gcp_region
+$elastic_cloud_plan.resources[0].kibana[0].region = $target_gcp_region
 $elastic_cloud_plan.resources[0].elasticsearch[0].plan.elasticsearch.version = $stack_version
 $elastic_cloud_plan.resources[0].kibana[0].plan.kibana.version = $stack_version
 if ($snapshot_name) {
