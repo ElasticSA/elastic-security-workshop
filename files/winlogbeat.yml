@@ -1,5 +1,5 @@
 cloud.id: "${CLOUD_ID}"
-cloud.auth: "elastic:${ES_PWD}"
+cloud.auth: "${CLOUD_AUTH}"
 
 winlogbeat.event_logs:
   - name: Application

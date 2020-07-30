@@ -49,6 +49,6 @@ output.elasticsearch:
   pipeline: geoip-info
 
 cloud.id: "${CLOUD_ID}"
-cloud.auth: "elastic:${ES_PWD}"
+cloud.auth: "${CLOUD_AUTH}"
 
 xpack.monitoring.enabled: true

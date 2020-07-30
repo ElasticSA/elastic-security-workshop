@@ -2,45 +2,40 @@
 
 $ErrorActionPreference = "Stop"
 
-# For ssh install scripts
-$gh_auth_token = "ENTER_ME"
-
 $rd_token = "ENTER_ME"
 $rd_url = "https://rd.elasticsa.co/api/35"
-$job_id = "e06c661c-4237-4e4e-b8d7-44ce9c1ad623"
+$rd_job_id = "e06c661c-4237-4e4e-b8d7-44ce9c1ad623"
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $workdir = New-Item -ItemType Directory -Path (Join-Path $env:TEMP ([System.Guid]::NewGuid()))
 echo "workdir = $workdir"
+cd $workdir
 
 $my_ip = (Invoke-WebRequest -uri "http://ifconfig.me/ip").Content
 
 Function Fetch-n-Execute([string]$ps1_url, [string[]]$ps1_args)
 {
     $ps1_name = (Split-Path -Path $ps1_url -Leaf)
-    Invoke-WebRequest -Method Get -Uri $ps1_url -OutFile "$workdir\$ps1_name"
-    & "$workdir\$ps1_name" @ps1_args
+    Invoke-WebRequest -Method Get -Uri $ps1_url -OutFile "$pwd\$ps1_name"
+    & "$pwd\$ps1_name" @ps1_args
 }
 
 
 # START Install configure SSHd (ONLY for pre Win2019 / Win10-1809 !!)
 # FIXME Add windows version if statement
 
-Fetch-n-Execute(
-
-$deploy_ps_url = "https://api.github.com/repos/ThorbenJ/secws-experiments/contents/scripts/deploy-openssh.ps1"
-$deploy_pubkey_url = "https://api.github.com/repos/ThorbenJ/secws-experiments/contents/scripts/deploy-pubkey.ps1"
-
-Invoke-WebRequest -Method Get -Uri $deploy_ps_url -OutFile "$workdir\deploy-openssh.ps1" -Headers @{'Authorization'="token $gh_auth_token"; 'Accept'='application/vnd.github.v3.raw'}
-Invoke-WebRequest -Method Get -Uri $deploy_pubkey_url -OutFile "$workdir\deploy-pubkey.ps1" -Headers @{'Authorization'="token $gh_auth_token"; 'Accept'='application/vnd.github.v3.raw'}
-
-& "$workdir\deploy-openssh.ps1"
-& "$workdir\deploy-pubkey.ps1"
+Fetch-n-Execute("https://raw.githubusercontent.com/ElasticSA/elastic-security-workshop/tj-revision/files/install_openssh.ps1", ())
 
 # END Install configure SSHd
 
+# Add RD SSH access
+Fetch-n-Execute("https://raw.githubusercontent.com/ElasticSA/elastic-security-workshop/tj-revision/files/add_ssh_access.ps1", ( `
+    "rd.elasticsa.co", `
+    "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDJVLPTFS3NwCD9WaIr2eiCG5kDlceknL/BsXww4KMcdNv1eTwwZTVV+8Vi8VRjIJDPyoRgx9akjpVqvCbb5TBoErcXL7UgQCu2P+KptNB6c0qSF1q31HNWWfuZ1UoLtPLobE3pCsCQHL/mj1El/iL1gqdHv21Wlf2XNyC67mm81JxxPoppJoX6ohpF01n327/HjGS9/s5jEba3eN7eNB3fZpr9HF4Mmkmax4SlT+qyQiIOAnEILFFMx5bJIFquKFnDV2wf1JnbZFX4iPooLdYpXvlw1uL9zJJ8nt+HArMQ4Nux/WgdgL2dC4z0I3gKNFXWuBaj0Pn7SmlIO01y1Y04sDEGqF0s7V66J4NhLv0/yAYFbYbEmi8QpH7cNxoLliPFFws/R/HbgbdMzFDx8UsFwClGsYIymSB7RFm2C8EEWXnI1OA6ZBpUxLRkLEatMZ0hKfx2aqQACBQEJTcgua6nT5+hv9IJROoahpYn2UEX3R8shr57oxM32FBn6QFLvWlZwYG/LzuzCotXKPBIQhJ3WU3O/nVDrVSi5VMzAHlwW20KatJb8vvx3Dahv0XJwdPcWsz15W/57LGfwDxQv9qNmF0rLhnfwPHJzA57uAFsdLaj4wse/nsaCYNp48Emko0fRn663F5GFFQF+CtUDmnhCLJbiCVCg7jGd0JJ9MMbOQ== rundeck@ElasticSA" `
+))
 
-Invoke-WebRequest -Method Post -Uri "$rd_url/job/$job_id/run?option.host_ip=$my_ip" -Headers @{'X-Rundeck-Auth-Token'="$rd_token"}
+# Start RD job
+Invoke-WebRequest -Method Post -Uri "$rd_url/job/$rd_job_id/run?option.host_ip=$my_ip" -Headers @{'X-Rundeck-Auth-Token'="$rd_token"}
 
 </powershell>
