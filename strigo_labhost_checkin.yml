@@ -1,0 +1,12 @@
+---
+
+- hosts: all
+  vars:
+    ansible_connection: ssh
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+    ansible_shell_type: powershell
+
+  tasks:
+  - name: Dump host info
+    debug: var=hostvars[inventory_hostname]
+    connection: local

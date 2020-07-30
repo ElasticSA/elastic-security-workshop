@@ -1,0 +1,46 @@
+<powershell>
+
+$ErrorActionPreference = "Stop"
+
+# For ssh install scripts
+$gh_auth_token = "ENTER_ME"
+
+$rd_token = "ENTER_ME"
+$rd_url = "https://rd.elasticsa.co/api/35"
+$job_id = "e06c661c-4237-4e4e-b8d7-44ce9c1ad623"
+
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+$workdir = New-Item -ItemType Directory -Path (Join-Path $env:TEMP ([System.Guid]::NewGuid()))
+echo "workdir = $workdir"
+
+$my_ip = (Invoke-WebRequest -uri "http://ifconfig.me/ip").Content
+
+Function Fetch-n-Execute([string]$ps1_url, [string[]]$ps1_args)
+{
+    $ps1_name = (Split-Path -Path $ps1_url -Leaf)
+    Invoke-WebRequest -Method Get -Uri $ps1_url -OutFile "$workdir\$ps1_name"
+    & "$workdir\$ps1_name" @ps1_args
+}
+
+
+# START Install configure SSHd (ONLY for pre Win2019 / Win10-1809 !!)
+# FIXME Add windows version if statement
+
+Fetch-n-Execute(
+
+$deploy_ps_url = "https://api.github.com/repos/ThorbenJ/secws-experiments/contents/scripts/deploy-openssh.ps1"
+$deploy_pubkey_url = "https://api.github.com/repos/ThorbenJ/secws-experiments/contents/scripts/deploy-pubkey.ps1"
+
+Invoke-WebRequest -Method Get -Uri $deploy_ps_url -OutFile "$workdir\deploy-openssh.ps1" -Headers @{'Authorization'="token $gh_auth_token"; 'Accept'='application/vnd.github.v3.raw'}
+Invoke-WebRequest -Method Get -Uri $deploy_pubkey_url -OutFile "$workdir\deploy-pubkey.ps1" -Headers @{'Authorization'="token $gh_auth_token"; 'Accept'='application/vnd.github.v3.raw'}
+
+& "$workdir\deploy-openssh.ps1"
+& "$workdir\deploy-pubkey.ps1"
+
+# END Install configure SSHd
+
+
+Invoke-WebRequest -Method Post -Uri "$rd_url/job/$job_id/run?option.host_ip=$my_ip" -Headers @{'X-Rundeck-Auth-Token'="$rd_token"}
+
+</powershell>
