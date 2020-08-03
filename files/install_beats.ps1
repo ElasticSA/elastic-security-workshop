@@ -1,10 +1,10 @@
 param (
     [string]$ec_id = $(throw "ec_id is required."),
-    [string]$ec_auth = $(throw "ec_auth is required.")
+    [string]$ec_auth = $(throw "ec_auth is required."),
     [string]$stack_version = $(throw "stack_version is required")
 )
 
-$beat_config_repository_uri = "https://github.com/ElasticSA/elastic-security-workshop/blob/tj-revision/files/"
+$beat_config_repository_uri = "https://raw.githubusercontent.com/ElasticSA/elastic-security-workshop/tj-revision/files/"
 
 #Uninstall all Elastic Beats already installed
 $app = Get-WmiObject -Class Win32_Product -Filter ("Vendor = 'Elastic'")
@@ -56,7 +56,7 @@ function ElasticBeatSetup ([string]$beat_name)
     Start-Service -Name $beat_name
 }
 ElasticBeatSetup("winlogbeat");
-ElasticBeatSetup("packetbeat");
 ElasticBeatSetup("metricbeat");
+ElasticBeatSetup("packetbeat"); #Packetbeat Fails on normal strigo vms?
 
 Write-Output "`nBeat setup complete!"
