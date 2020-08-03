@@ -1,0 +1,35 @@
+---
+
+- name: "Get temp dir"
+  win_tempfile: state=directory
+  register: tmpd
+
+- name: Copy over install scripts
+  win_copy:
+    src: "{{ item }}"
+    dest: "{{ tmpd.path }}"
+  loop:
+  - install_sysmon.ps1
+  - install_beats.ps1
+
+- name: Install sysmon
+  win_shell: "{{ tmpd.path }}\\install_sysmon.ps1"
+  args:
+    chdir: "{{ tmpd.path }}"
+  register: script_results
+
+- name: Print output
+  debug: var=script_results.stdout_lines
+
+- name: Install Beats
+  win_shell: "{{ tmpd.path }}\\install_beats.ps1 {{ el_cloud_id }} {{ el_cloud_auth }} {{ stack_version }}"
+  args:
+    chdir: "{{ tmpd.path }}"
+
+- name: Print output
+  debug: var=script_results.stdout_lines
+
+- name: Add Cluster_Info.txt
+  win_template:
+    src: cluster_info..txt.j2
+    dest: "C:\\Users\\Administrator\\Desktop\\Cluster_Info.txt"

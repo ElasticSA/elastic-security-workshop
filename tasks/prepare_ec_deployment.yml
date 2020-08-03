@@ -1,0 +1,261 @@
+---
+
+# Might convert this to a Role, but for now its a task list.
+
+# The Instance Configuration API, from ECE, does not appear to be available on EC
+- name: Initial variables
+  set_fact:
+    geo_info:
+      EMEA:
+        regions:
+          aws:
+            eu-west-1: ~
+            aws-eu-central-1: ~
+            aws-eu-west-2: ~
+            aws-eu-west-3: ~
+          azure:
+            azure-westeurope: ~
+            azure-uksouth: #Odd one out
+              hot_instance: azure.data.highio.e32sv3
+            azure-northeurope: ~
+            azure-francecentral:
+              hot_instance: azure.data.highio.e32sv3
+          gcp:
+            gcp-europe-west1: ~
+            gcp-europe-west3: ~
+            gcp-europe-west2: ~
+            gcp-europe-north1: ~
+            gcp-europe-west4: ~
+      AMER:
+        regions:
+          aws:
+            us-east-1: ~
+            us-west-1: ~
+            us-west-2: ~
+            aws-us-east-2: ~
+            aws-ca-central-1: ~
+          azure:
+            azure-eastus2: ~
+            azure-westus2: ~
+          gcp:
+            gcp-us-central1: ~
+            gcp-us-west1: ~
+            gcp-us-east4: ~
+            gcp-northamerica-northeast1: ~
+            gcp-us-east1: ~
+      APAC:
+        regions:
+          aws:
+            ap-southeast-1: ~
+            ap-southeast-2: ~
+            ap-northeast-1: ~
+          azure:
+            azure-southeastasia: ~
+            azure-japaneast: ~
+          gcp:
+            gcp-asia-northeast1: ~
+            gcp-australia-southeast1: ~
+            gcp-asia-south1: ~
+            gcp-asia-southeast1: ~
+            gcp-asia-east1: ~
+    provider_defaults:
+      aws:
+        template_id: aws-io-optimized-v2
+        hot_instance: aws.data.highio.i3
+        ml_instance: aws.ml.m5d
+        kib_instance: aws.kibana.r5d
+        apm_instance: aws.apm.r5d
+      azure:
+        template_id: azure-io-optimized
+        hot_instance: azure.data.highio.l32sv2
+        ml_instance: azure.ml.d64sv3
+        kib_instance: azure.kibana.e32sv3
+        apm_instance: azure.apm.e32sv3
+      gcp:
+        template_id: gcp-io-optimized
+        hot_instance: gcp.data.highio.1
+        ml_instance: gcp.ml.1
+        kib_instance: gcp.kibana.1
+        apm_instance: gcp.apm.1
+
+- name: Dump instance configuration
+  debug: var=geo_info
+  
+- name: Dump instance configuration
+  debug: var=provider_defaults
+
+- name: Select provider
+  set_fact:
+    ec_provider: "{{ ec_provider |default(selected_providers|random) }}"
+
+- name: Select region
+  set_fact:
+    ec_region: "{{ ec_region |default(geo_info[deployment_geo].regions[ec_provider].keys()|list|random) }}"
+
+- name: Select instances
+  set_fact:
+    ec_instances:
+      hot_instance: "{{ (geo_info[deployment_geo].regions[ec_provider][ec_region].hot_instance) |default(provider_defaults[ec_provider].hot_instance) }}"
+      ml_instance: "{{ (geo_info[deployment_geo].regions[ec_provider][ec_region].ml_instance) |default(provider_defaults[ec_provider].ml_instance) }}"
+      kib_instance: "{{ (geo_info[deployment_geo].regions[ec_provider][ec_region].kib_instance) |default(provider_defaults[ec_provider].kib_instance) }}"
+      apm_instance: "{{ (geo_info[deployment_geo].regions[ec_provider][ec_region].apm_instance) |default(provider_defaults[ec_provider].apm_instance) }}"
+
+- name: Creation information
+  debug:
+    msg:
+    - "stack_version({{ stack_version }})"
+    - "ec_provider({{ ec_provider }})"
+    - "ec_region({{ ec_region }})"
+    - "template({{ provider_defaults[ec_provider].template_id }})"
+    - "hot_instance({{ ec_instances.hot_instance }})"
+    - "ml_instance({{ ec_instances.ml_instance }})"
+    - "kib_instance({{ ec_instances.kib_instance }})"
+    - "apm_instance({{ ec_instances.apm_instance }})"
+
+- name: Create deployment
+  uri:
+    url: "{{ ec_api_url }}/deployments?validate_only=false"
+    method: POST
+    body_format: json
+    body:
+      name: "{{ ansible_date_time.date }} {{ deployment_geo }} Security Workshop"
+      metadata:
+        system_owned: false
+      resources:
+        elasticsearch:
+        - region: "{{ ec_region }}"
+          ref_id: "main-elasticsearch"
+          plan:
+            cluster_topology:
+            - node_type:
+                data: true
+                master: true
+                ingest: true
+              instance_configuration_id: "{{ ec_instances.hot_instance }}"
+              zone_count: 2
+              size:
+                resource: memory
+                value: 8192
+              elasticsearch:
+                enabled_built_in_plugins:
+                - mapper-size
+                - analysis-icu
+            - node_type:
+                data: false
+                master: false
+                ingest: false
+                ml: true
+              instance_configuration_id: "{{ ec_instances.ml_instance }}"
+              zone_count: 2
+              size:
+                resource: memory
+                value: 8192
+              elasticsearch:
+                enabled_built_in_plugins:
+                - mapper-size
+                - analysis-icu
+            elasticsearch:
+              version: "{{ stack_version }}"
+            deployment_template:
+              id: "{{ provider_defaults[ec_provider].template_id }}"
+          settings:
+            dedicated_masters_threshold: 6
+        kibana:
+        - region: "{{ ec_region }}"
+          elasticsearch_cluster_ref_id: main-elasticsearch
+          ref_id: main-kibana
+          plan:
+            cluster_topology:
+            - instance_configuration_id: "{{ ec_instances.kib_instance }}"
+              zone_count: 1
+              size:
+                resource: memory
+                value: 1024
+            kibana:
+              version: "{{ stack_version }}"
+        apm:
+        - region: "{{ ec_region }}"
+          elasticsearch_cluster_ref_id: main-elasticsearch
+          ref_id: main-apm
+          plan:
+            cluster_topology:
+            - instance_configuration_id: "{{ ec_instances.apm_instance }}"
+              zone_count: 1
+              size:
+                resource: memory
+                value: 512
+            apm:
+              version: "{{ stack_version }}"
+    headers:
+      Authorization: ApiKey {{ ec_api_key }}
+      Accept: "application/json"
+    timeout: "{{ ec_api_timeout }}"
+    status_code: [200,201]
+  register: create_deploy_result
+
+  # We always want to dump this info to logs, so verbosity=0
+- name: Dump URI results
+  debug: var=create_deploy_result.json verbosity=0
+
+- name: Check plan started ok
+  fail: msg="Deployment creation did not start"
+  when: not create_deploy_result.json.created|bool
+
+- name: Wait until deployment ready
+  uri:
+    url: "{{ ec_api_url }}/deployments/{{ create_deploy_result.json.id }}"
+    method: GET
+    body_format: json
+    body: ~
+    headers:
+      Authorization: ApiKey {{ ec_api_key }}
+      Accept: "application/json"
+    timeout: "{{ ec_api_timeout }}"
+  register: check_deploy_result
+  until: |
+    'json' is in check_deploy_result
+    and check_deploy_result.json.healthy|bool
+    and 'pending' not in check_deploy_result.json.resources.elasticsearch.0.info.plan_info
+    and 'pending' not in check_deploy_result.json.resources.kibana.0.info.plan_info
+  delay: 20
+  retries: 100
+
+  # We always want to dump this info to logs, so verbosity=0
+- name: Dump URI results
+  debug: var=check_deploy_result.json verbosity=0
+
+- name: Capture deployment details
+  set_fact:
+    ec_deployment_id: "{{ create_deploy_result.json.id }})"
+    el_cloud_id: "{{ create_deploy_result.json.resources.0.cloud_id }}"
+    el_cloud_auth: "{{ _el_login[0] }}:{{ _el_login[1] }}"
+    el_search_url: "https://{{ check_deploy_result.json.resources.elasticsearch.0.info.metadata.endpoint }}"
+    el_kibana_url: "https://{{ check_deploy_result.json.resources.kibana.0.info.metadata.endpoint }}"
+    el_login: "{{ _el_login|list }}"
+  vars:
+    _el_login:
+    - "{{ create_deploy_result.json.resources.0.credentials.username }}"
+    - "{{ create_deploy_result.json.resources.0.credentials.password }}"
+  tags:
+  - always
+
+- name: Print deployment details
+  debug:
+    msg:
+    - "ec_deployment_id({{ ec_deployment_id }}"
+    - "el_cloud_id({{ el_cloud_id }})"
+    - "el_cloud_auth({{ el_cloud_auth }})"
+    - "el_search_url({{ el_search_url }})"
+    - "el_kibana_url({{ el_kibana_url }})"
+
+- name: Import Workshop indecx data
+  include_role:
+    name: ThorbenJ.elasticsearch_exporter
+  vars:
+    elex_task: import
+    elex_cloud_id: "{{ el_cloud_id }}"
+    elex_cloud_auth: "{{ el_cloud_auth }}"
+    elex_index: "{{ item }}"
+    elex_workdir: "{{ exports_dir }}"
+    elex_export_date: "{{ exports_date }}"
+  loop: "{{ index_import_list }}"

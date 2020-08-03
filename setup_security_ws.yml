@@ -1,0 +1,33 @@
+---
+
+- hosts: all
+  vars:
+    deployment_geo: EMEA
+    stack_version: "7.7.1"
+    exports_dir: "{{ lookup('env', 'TMPDIR')|default('/var/tmp')|regex_replace('/+$','') }}/elasticsearch_exports"
+    exports_date: "{{ ansible_date_time.date }}"
+    index_import_list:
+    - ".kibana_1"
+    selected_providers: ['aws','azure','gcp']
+    ec_api_url: https://api.elastic-cloud.com/api/v1
+    ec_api_timeout: 120
+    #ansible_connection: ssh
+    #ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+    #ansible_shell_type: powershell
+
+  tasks:
+  - name: Fail check
+    fail: msg="Missing parameter"
+    when: ec_api_key is not string
+
+  - name: Initiate Elastic Cloud Deployment
+    import_tasks: tasks/prepare_ec_deployment.yml
+    delegate_to: localhost
+    connection: local
+
+  - fail: msg="stop"
+  
+  - name: Setup strigo host
+    import_tasks: tasks/prepare_strigo_host.yml
+    
+
