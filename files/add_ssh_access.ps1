@@ -33,11 +33,9 @@ Set-ItemProperty -Path "HKLM:\SOFTWARE\OpenSSH" -Name DefaultShell -Value "$ps_l
 
 $rem_ip = [System.Net.Dns]::GetHostAddresses($RemHost)[0].IPAddressToString;
 
+$FWrules = Get-NetFirewallRule
 echo "Opening firewall for just $RemHost"
 # Allow ES SA Rundeck only (enabled)
-if (Get-NetFirewallRule -Name "sshd_$rem_ip") {
-    #Set-NetFirewallRule -Name "sshd_$rem_ip" -DisplayName "OpenSSH Server (sshd) for $RemHost" -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22 -RemoteAddress $rem_ip
-}
-else {
+if (-Not $FWrules.Name.Contains("sshd_$rem_ip")) {
     New-NetFirewallRule -Name "sshd_$rem_ip" -DisplayName "OpenSSH Server (sshd) for $RemHost" -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22 -RemoteAddress $rem_ip
 }

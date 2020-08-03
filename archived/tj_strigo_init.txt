@@ -8,8 +8,7 @@ $rd_job_id = "e06c661c-4237-4e4e-b8d7-44ce9c1ad623"
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-#$workdir = New-Item -ItemType Directory -Path (Join-Path $env:TEMP ([System.Guid]::NewGuid()))
-$workdir = "C:\Users\Administrator\AppData\Local\Temp\2\47c3d687-fa45-44f2-a5b2-7d81ab17b19f"
+$workdir = New-Item -ItemType Directory -Path (Join-Path $env:TEMP ([System.Guid]::NewGuid()))
 echo "workdir = $workdir"
 cd $workdir
 
