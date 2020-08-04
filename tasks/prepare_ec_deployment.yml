@@ -15,7 +15,7 @@
             aws-eu-west-3: ~
           azure:
             azure-westeurope: ~
-            azure-uksouth: #Odd one out
+            azure-uksouth:
               hot_instance: azure.data.highio.e32sv3
             azure-northeurope: ~
             azure-francecentral:
@@ -80,19 +80,19 @@
 
 - name: Dump instance configuration
   debug: var=geo_info
-  
+
 - name: Dump instance configuration
   debug: var=provider_defaults
 
-- name: Select provider
+- name: "Select provider ( {{ deployment_geo }} )"
   set_fact:
     ec_provider: "{{ ec_provider |default(selected_providers|random) }}"
 
-- name: Select region
+- name: "Select region ( {{ deployment_geo }} / {{ ec_provider }} )"
   set_fact:
     ec_region: "{{ ec_region |default(geo_info[deployment_geo].regions[ec_provider].keys()|list|random) }}"
 
-- name: Select instances
+- name: "Select instances ( {{ deployment_geo }} / {{ ec_provider }} / {{ ec_region }} )"
   set_fact:
     ec_instances:
       hot_instance: "{{ (geo_info[deployment_geo].regions[ec_provider][ec_region].hot_instance) |default(provider_defaults[ec_provider].hot_instance) }}"
@@ -103,6 +103,7 @@
 - name: Creation information
   debug:
     msg:
+    - "deployment_geo({{ deployment_geo }})"
     - "stack_version({{ stack_version }})"
     - "ec_provider({{ ec_provider }})"
     - "ec_region({{ ec_region }})"
@@ -197,9 +198,10 @@
 - name: Dump URI results
   debug: var=create_deploy_result.json verbosity=0
 
-- name: Check plan started ok
-  fail: msg="Deployment creation did not start"
-  when: not create_deploy_result.json.created|bool
+- name: Check that plan started ok
+  assert:
+    fail_msg: "Deployment creation did not start"
+    that: create_deploy_result.json.created|bool
 
 - name: Wait until deployment ready
   uri:
@@ -259,3 +261,15 @@
     elex_workdir: "{{ exports_dir }}"
     elex_export_date: "{{ exports_date }}"
   loop: "{{ index_import_list }}"
+
+- name: (Post-test) Delete deployment
+  uri:
+    url: "{{ ec_api_url }}/deployments/{{ create_deploy_result.json.id }}/_shutdown?skip_snapshot=true"
+    method: POST
+    body_format: json
+    headers:
+      Authorization: ApiKey {{ ec_api_key }}
+      Accept: "application/json"
+    timeout: "{{ ec_api_timeout }}"
+  register: delete_deploy_result
+  when: posttest_delete is defined and posttest_delete|bool
